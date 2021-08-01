@@ -28,18 +28,13 @@ from keras import backend as K
 
 import os
 os.environ["PATH"] += os.pathsep + 'C:/Program Files (x86)/Graphviz2.38/bin/'
-# =============================================================================
-# from keras.utils.vis_utils import plot_model
-# =============================================================================
 
 
 def _bn_relu(input):
     """Helper to build a BN -> relu block
     """
     norm = BatchNormalization(axis=CHANNEL_AXIS)(input)
-# =============================================================================
-#     return Activation("tanh")(norm)
-# =============================================================================
+    
     return Activation("relu")(norm)
 
 
@@ -51,9 +46,6 @@ def _conv_bn_relu(**conv_params):
     strides = conv_params.setdefault("strides", (1, 1))
     kernel_initializer = conv_params.setdefault("kernel_initializer", "he_normal")
     padding = conv_params.setdefault("padding", "same")
-# =============================================================================
-#     kernel_constraint = conv_params.setdefault("kernel_constraint", max_norm(2.))
-# =============================================================================
     kernel_regularizer = conv_params.setdefault("kernel_regularizer", l2(1.e-4))
 
     def f(input):
@@ -75,9 +67,6 @@ def _bn_relu_conv(**conv_params):
     strides = conv_params.setdefault("strides", (1, 1))
     kernel_initializer = conv_params.setdefault("kernel_initializer", "he_normal")
     padding = conv_params.setdefault("padding", "same")
-# =============================================================================
-#     kernel_constraint = conv_params.setdefault("kernel_constraint", max_norm(2.))
-# =============================================================================
     kernel_regularizer = conv_params.setdefault("kernel_regularizer", l2(1.e-4))
 
     dropout_keep_prob = 0.8
@@ -94,11 +83,6 @@ def _bn_relu_conv(**conv_params):
 
 
 def _shortcut(input, residual):
-    """Adds a shortcut between input and residual block and merges them with "sum"
-    """
-    # Expand channels of shortcut to match residual.
-    # Stride appropriately to match residual (width, height)
-    # Should be int if network architecture is correctly configured.
     input_shape = K.int_shape(input)
     residual_shape = K.int_shape(residual)
     stride_width = int(round(input_shape[ROW_AXIS] / residual_shape[ROW_AXIS]))
@@ -106,7 +90,7 @@ def _shortcut(input, residual):
     equal_channels = input_shape[CHANNEL_AXIS] == residual_shape[CHANNEL_AXIS]
 
     shortcut = input
-    # 1 X 1 conv if shape is different. Else identity.
+    
     if stride_width > 1 or stride_height > 1 or not equal_channels:
         shortcut = Conv2D(filters=residual_shape[CHANNEL_AXIS],
                           kernel_size=(1, 1),
@@ -119,8 +103,6 @@ def _shortcut(input, residual):
 
 
 def _residual_block(block_function, filters, repetitions, is_first_layer=False):
-    """Builds a residual block with repeating bottleneck blocks.
-    """
     def f(input):
         for i in range(repetitions):
             init_strides = (1, 1)
@@ -134,10 +116,6 @@ def _residual_block(block_function, filters, repetitions, is_first_layer=False):
 
 
 def basic_block(filters, init_strides=(1, 1), is_first_block_of_first_layer=False):
-    """Basic 3 X 3 convolution blocks for use on resnets with layers <= 34.
-    Follows improved proposed scheme in http://arxiv.org/pdf/1603.05027v2.pdf
-    """
-    
     def f(input):
 
         if is_first_block_of_first_layer:
@@ -159,12 +137,6 @@ def basic_block(filters, init_strides=(1, 1), is_first_block_of_first_layer=Fals
 
 
 def bottleneck(filters, init_strides=(1, 1), is_first_block_of_first_layer=False):
-    """Bottleneck architecture for > 34 layer resnet.
-    Follows improved proposed scheme in http://arxiv.org/pdf/1603.05027v2.pdf
-    Returns:
-        A final conv layer of filters * 4
-    """
-    
     dropout_keep_prob = 0.8
     
     def f(input):
@@ -216,17 +188,6 @@ def _get_block(identifier):
 class ResnetBuilder(object):
     @staticmethod
     def build(input_shape, num_outputs, block_fn, repetitions):
-        """Builds a custom ResNet like architecture.
-        Args:
-            input_shape: The input shape in the form (nb_channels, nb_rows, nb_cols)
-            num_outputs: The number of outputs at final softmax layer
-            block_fn: The block function to use. This is either `basic_block` or `bottleneck`.
-                The original paper used basic_block for layers < 50
-            repetitions: Number of repetitions of various block units.
-                At each block unit, the number of filters are doubled and the input size is halved
-        Returns:
-            The keras `Model`.
-        """
         dropout_keep_prob = 0.8
         
         _handle_dim_ordering()
@@ -238,11 +199,7 @@ class ResnetBuilder(object):
         ##    input_shape = (input_shape[1], input_shape[2], input_shape[0])
 
         input = Input(shape=input_shape)
-# =============================================================================
-#         permute0 = Permute((2,3,1))(input)
-# =============================================================================
 
-        # Load function from str if needed.
         block_fn = _get_block(block_fn)
         filters_mat = [32, 48, 64, 96, 128, 192, 256, 384, 512]
         
@@ -308,9 +265,6 @@ class ResnetBuilder(object):
                       activation="linear")(block)
 
         model = Model(inputs=input, outputs=block)
-# =============================================================================
-#         plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
-# =============================================================================
         
         return model
 
